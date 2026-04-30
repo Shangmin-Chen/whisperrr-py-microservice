@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+faster-whisper
+pydantic
+pydantic_settings
+python-dotenv
+httpx
+librosa
+soundfile
+audioread
+pytest
+pytest-asyncio
