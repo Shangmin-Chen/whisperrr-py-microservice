@@ -11,11 +11,23 @@ These tests verify that the job manager properly handles:
 """
 
 import pytest
-import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
 from app.job_manager import JobManager, Job, JobStatus
+from app.models import TranscriptionResponse
+
+
+def _sample_transcription_response(text: str = "Done") -> TranscriptionResponse:
+    return TranscriptionResponse(
+        text=text,
+        language=None,
+        duration=0.0,
+        segments=[],
+        confidence_score=None,
+        model_used="base",
+        processing_time=0.0,
+    )
 
 
 class TestJob:
@@ -62,10 +74,10 @@ class TestJob:
     def test_set_result_completes_job(self):
         """Test that set_result completes job."""
         job = Job("test-job-id")
-        result = {"text": "Transcribed text"}
-        
+        result = _sample_transcription_response("Transcribed text")
+
         job.set_result(result)
-        
+
         assert job.status == JobStatus.COMPLETED
         assert job.progress == 100.0
         assert job.result == result
@@ -150,7 +162,7 @@ class TestJobManager:
         """Test that cleanup_old_jobs removes old jobs."""
         # Create old job (manually set created_at to past)
         old_job = manager.create_job()
-        old_job.created_at = datetime.utcnow() - timedelta(seconds=3700)  # > 1 hour
+        old_job.created_at = datetime.now(timezone.utc) - timedelta(seconds=3700)
         
         # Create new job
         new_job = manager.create_job()
@@ -204,7 +216,7 @@ class TestJobManager:
         job.set_status(JobStatus.PROCESSING, "Starting")
         assert job.status == JobStatus.PROCESSING
         
-        job.set_result({"text": "Done"})
+        job.set_result(_sample_transcription_response("Done"))
         assert job.status == JobStatus.COMPLETED
     
     def test_job_error_handling(self, manager):

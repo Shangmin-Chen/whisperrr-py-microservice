@@ -59,32 +59,32 @@ class TestFileValidation:
     
     def test_validate_file_format_with_valid_format(self):
         """Test that validate_file_format accepts valid formats."""
-        with patch('app.utils.settings') as mock_settings:
+        with patch('app.utils.files.settings') as mock_settings:
             mock_settings.supported_formats_set = {"mp3", "wav", "m4a"}
             assert validate_file_format("audio.mp3") is True
             assert validate_file_format("audio.wav") is True
     
     def test_validate_file_format_with_invalid_format(self):
         """Test that validate_file_format rejects invalid formats."""
-        with patch('app.utils.settings') as mock_settings:
+        with patch('app.utils.files.settings') as mock_settings:
             mock_settings.supported_formats_set = {"mp3", "wav", "m4a"}
             assert validate_file_format("file.txt") is False
     
     def test_validate_file_size_with_valid_size(self):
         """Test that validate_file_size accepts valid sizes."""
-        with patch('app.utils.settings') as mock_settings:
+        with patch('app.utils.files.settings') as mock_settings:
             mock_settings.max_file_size_bytes = 50 * 1024 * 1024
             assert validate_file_size(10 * 1024 * 1024) is True
     
     def test_validate_file_size_with_invalid_size(self):
         """Test that validate_file_size rejects invalid sizes."""
-        with patch('app.utils.settings') as mock_settings:
+        with patch('app.utils.files.settings') as mock_settings:
             mock_settings.max_file_size_bytes = 50 * 1024 * 1024
             assert validate_file_size(1500 * 1024 * 1024) is False
     
     def test_validate_file_size_at_limit(self):
         """Test that validate_file_size accepts size at limit."""
-        with patch('app.utils.settings') as mock_settings:
+        with patch('app.utils.files.settings') as mock_settings:
             mock_settings.max_file_size_bytes = 50 * 1024 * 1024
             assert validate_file_size(1000 * 1024 * 1024) is True
 

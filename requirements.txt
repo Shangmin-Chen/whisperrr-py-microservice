@@ -1,13 +1,4 @@
-fastapi
-uvicorn[standard]
-python-multipart
-faster-whisper
-pydantic
-pydantic_settings
-python-dotenv
-httpx
-librosa
-soundfile
-audioread
-pytest
-pytest-asyncio
+# Dependency source of truth is pyproject.toml.
+# Runtime (e.g. Docker): pip install .
+# With dev tools: pip install '.[dev]'
+.

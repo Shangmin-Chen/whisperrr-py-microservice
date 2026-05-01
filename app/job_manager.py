@@ -2,9 +2,11 @@
 
 import uuid
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict
 from enum import Enum
+
+from .config import settings
 from .models import TranscriptionResponse
 
 
@@ -27,8 +29,8 @@ class Job:
         self.message = "Job created"
         self.result: Optional[TranscriptionResponse] = None
         self.error: Optional[str] = None
-        self.created_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.created_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
         self._lock = threading.Lock()
     
     def update_progress(self, progress: float, message: Optional[str] = None):
@@ -37,7 +39,7 @@ class Job:
             self.progress = max(0.0, min(100.0, progress))
             if message:
                 self.message = message
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
     
     def set_status(self, status: JobStatus, message: Optional[str] = None):
         """Set job status."""
@@ -45,7 +47,7 @@ class Job:
             self.status = status
             if message:
                 self.message = message
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
     
     def set_result(self, result: TranscriptionResponse):
         """Set job result and mark as completed."""
@@ -54,7 +56,7 @@ class Job:
             self.status = JobStatus.COMPLETED
             self.progress = 100.0
             self.message = "Transcription completed"
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
     
     def set_error(self, error: str):
         """Set job error and mark as failed."""
@@ -62,7 +64,7 @@ class Job:
             self.error = error
             self.status = JobStatus.FAILED
             self.message = error
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
     
     def to_dict(self) -> Dict:
         """Convert job to dictionary."""
@@ -72,7 +74,7 @@ class Job:
                 "status": self.status.value,
                 "progress": self.progress,
                 "message": self.message,
-                "result": self.result.dict() if self.result else None,
+                "result": self.result.model_dump() if self.result else None,
                 "error": self.error,
                 "created_at": self.created_at.isoformat(),
                 "updated_at": self.updated_at.isoformat()
@@ -106,12 +108,10 @@ class JobManager:
     
     def cleanup_old_jobs(self, max_age_seconds: Optional[int] = None):
         """Remove jobs older than max_age_seconds."""
-        from .config import settings
-        
         if max_age_seconds is None:
             max_age_seconds = settings.job_cleanup_max_age_seconds
         
-        cutoff = datetime.utcnow() - timedelta(seconds=max_age_seconds)
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
         with self._lock:
             to_delete = [
                 job_id for job_id, job in self._jobs.items()

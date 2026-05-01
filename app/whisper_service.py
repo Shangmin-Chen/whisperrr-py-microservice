@@ -4,7 +4,7 @@ import asyncio
 import time
 import threading
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List, Callable
 from concurrent.futures import ThreadPoolExecutor
 from faster_whisper import WhisperModel
@@ -139,7 +139,7 @@ class WhisperService:
         
         try:
             # Load model in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             self._model = await loop.run_in_executor(
                 self._executor,
                 self._load_model_sync,
@@ -185,12 +185,14 @@ class WhisperService:
         model_size: Optional[str] = None,
         language: Optional[str] = None,
         temperature: float = 0.0,
-        task: str = "transcribe",
+        task: Optional[str] = None,
         progress_callback: Optional[Callable[[float, str], None]] = None
     ) -> TranscriptionResponse:
         """Transcribe audio file using Faster Whisper."""
         if self._model is None:
             raise ModelNotLoaded("No model is currently loaded")
+
+        effective_task = task if task is not None else settings.default_task
         
         if model_size and model_size != self._model_size:
             # Load different model if requested
@@ -224,14 +226,14 @@ class WhisperService:
                         mapped_progress = settings.transcription_progress_min + (p * progress_range / 100.0)
                         progress_callback(mapped_progress, m)
                 
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 result = await loop.run_in_executor(
                     self._executor,
                     self._transcribe_sync,
                     processed_file,
                     language,
                     temperature,
-                    task,
+                    effective_task,
                     transcription_callback
                 )
                 
@@ -275,7 +277,7 @@ class WhisperService:
         options = {
             "beam_size": settings.beam_size,
             "temperature": temperature,
-            "task": settings.default_task
+            "task": task,
         }
         
         if progress_callback:
@@ -310,15 +312,7 @@ class WhisperService:
         
         if progress_callback:
             progress_callback(95.0, "Formatting transcription results...")
-        
-        # Build result dictionary compatible with existing response format
-        if info is None:
-            raise TranscriptionFailed(
-                message="Transcription info object is None",
-                original_error="info is None",
-                file_path=file_path
-            )
-        
+
         # Safely extract language and language_probability
         try:
             language_value = info.language if hasattr(info, 'language') else None
@@ -441,7 +435,7 @@ class WhisperService:
             load_time_seconds=0.0 if not self._model_load_time else time.time() - self._model_load_time,
             supported_languages=self._supported_languages,
             is_loaded=self._model is not None,
-            last_loaded=datetime.fromtimestamp(self._model_load_time) if self._model_load_time else None
+            last_loaded=datetime.fromtimestamp(self._model_load_time, tz=timezone.utc) if self._model_load_time else None
         )
     
     

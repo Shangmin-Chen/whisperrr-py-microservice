@@ -18,21 +18,16 @@ RUN useradd -m -u 1000 appuser && \
     mkdir -p /home/appuser/.cache/huggingface && \
     chown -R appuser:appuser /app /tmp/whisperrr_uploads /home/appuser/.cache
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy project metadata and package, then install (no dev extras in image)
+COPY pyproject.toml README.md ./
+COPY app ./app/
+RUN pip install --no-cache-dir .
 
-# Copy application code
-COPY app/ ./app/
-
-# Copy entrypoint script
+# Copy entrypoint script (after install; not part of wheel)
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 
-# Change ownership
 RUN chown -R appuser:appuser /app && \
     chmod +x /docker-entrypoint.sh
-
-# Expose port
 EXPOSE 5001
 
 # Set environment variables for production and performance optimization
@@ -43,8 +38,11 @@ ENV PYTHONOPTIMIZE=2
 ENV OMP_NUM_THREADS=4
 ENV MKL_NUM_THREADS=4
 ENV NUMEXPR_NUM_THREADS=4
-# Uvicorn worker configuration (default to 4 workers for 4 CPUs)
-ENV UVICORN_WORKERS=4
+# Uvicorn workers: MUST stay 1 unless you replace the in-memory JobManager with shared
+# storage (e.g. Redis/DB). Multiple processes do not share job state; jobs would 404 on
+# random workers. Raise only after implementing an external job store and load balancer
+# stickiness (or equivalent).
+ENV UVICORN_WORKERS=1
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
