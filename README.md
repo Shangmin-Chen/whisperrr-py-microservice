@@ -6,6 +6,7 @@ Sibling packages in this repo: `whisperrr-frontend/`, `whisperrr-backend/`.
 
 ## Prerequisites
 
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - Python 3.12
 - FFmpeg
 
@@ -15,7 +16,7 @@ CORS is mainly relevant if browsers call FastAPI directly. Optional `./setup-env
 
 ## Run locally
 
-Use a **virtualenv** so dependencies do not touch your system Python.
+From this directory:
 
 1. **Environment file (CORS)** — first time, or when frontend/backend ports change:
 
@@ -23,47 +24,36 @@ Use a **virtualenv** so dependencies do not touch your system Python.
    ./setup-env.sh
    ```
 
-2. **Create and activate venv** (from this directory):
+2. **Sync dependencies** from `uv.lock`:
 
    ```bash
-   python3.12 -m venv venv
-   source venv/bin/activate          # Windows: venv\Scripts\activate
-   pip install -e '.[dev]'
+   uv sync --extra dev
    ```
 
 3. **Start the server**:
 
    ```bash
-   python -m uvicorn app.main:app --host 0.0.0.0 --port 5001
+   uv run uvicorn app.main:app --host 0.0.0.0 --port 5001
    ```
 
    Add `--reload` during development if you want auto-reload on code changes.
 
 Health check: http://localhost:5001/health
 
-### Using uv instead
-
-If you use [uv](https://github.com/astral-sh/uv), a manual `venv` + `activate` is optional; `uv` manages `.venv`:
-
-```bash
-uv sync --extra dev
-uv run uvicorn app.main:app --host 0.0.0.0 --port 5001
-```
-
 ### Uvicorn workers and async jobs
 
-The service keeps **asynchronous transcription jobs in process memory** (`JobManager`). Use **a single Uvicorn worker** (the Docker image defaults `UVICORN_WORKERS=1`). If you set `--workers`/`UVICORN_WORKERS` greater than 1, `/jobs/*` may break: each worker has its own job map, so polling can hit a different process and return 404. Before scaling out, add a **shared job store** (and usually session affinity or a single API tier) and route job creation and status checks through that store.
+The service keeps **asynchronous transcription jobs in process memory** (`JobManager`). Use **a single Uvicorn worker** unless you introduce a shared job store. If you set `--workers`/`UVICORN_WORKERS` greater than 1, `/jobs/*` may break: each worker has its own job map, so polling can hit a different process and return 404. Before scaling out, add a **shared job store** (and usually session affinity or a single API tier) and route job creation and status checks through that store.
 
 ## Tests
 
 ```bash
-python -m pytest
+uv run pytest
 ```
 
 ## Formatting
 
 ```bash
-black app/
+uv run black app/
 ```
 
 ## License

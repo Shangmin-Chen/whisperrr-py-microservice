@@ -14,15 +14,15 @@ import pytest
 import asyncio
 import tempfile
 import os
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
-from faster_whisper import WhisperModel
+from unittest.mock import Mock, patch
 
 from app.whisper_service import WhisperService
 from app.exceptions import (
     ModelNotLoaded,
     ModelLoadFailed,
     TranscriptionFailed,
-    AudioProcessingError
+    AudioProcessingError,
+    FileSystemError,
 )
 
 
@@ -50,7 +50,7 @@ class TestWhisperService:
     @pytest.mark.asyncio
     async def test_load_model_when_already_loaded_returns_cached(self, service):
         """Test that loading an already loaded model returns cached info."""
-        with patch.object(service, '_load_model_sync', return_value=Mock()):
+        with patch("app.whisper_service.load_whisper_model_sync", return_value=Mock()):
             await service.load_model("base")
             result = await service.load_model("base")
             
@@ -69,14 +69,14 @@ class TestWhisperService:
     @pytest.mark.asyncio
     async def test_load_model_when_model_load_fails_raises_exception(self, service):
         """Test that model loading failure raises exception."""
-        with patch.object(service, '_load_model_sync', side_effect=Exception("Load failed")):
+        with patch("app.whisper_service.load_whisper_model_sync", side_effect=Exception("Load failed")):
             with pytest.raises(ModelLoadFailed):
                 await service.load_model("base")
     
     @pytest.mark.asyncio
     async def test_load_model_with_invalid_model_size_raises_exception(self, service):
         """Test that invalid model size raises exception."""
-        with patch.object(service, '_load_model_sync', side_effect=ValueError("Invalid model")):
+        with patch("app.whisper_service.load_whisper_model_sync", side_effect=ValueError("Invalid model")):
             with pytest.raises(ModelLoadFailed):
                 await service.load_model("invalid-model")
     
@@ -92,10 +92,10 @@ class TestWhisperService:
     
     @pytest.mark.asyncio
     async def test_transcribe_audio_with_nonexistent_file_raises_exception(self, service):
-        """Test that transcription with nonexistent file raises exception."""
+        """Missing files surface as file-system errors from validation."""
         service._model = Mock()
-        
-        with pytest.raises(TranscriptionFailed):
+
+        with pytest.raises(FileSystemError):
             await service.transcribe_audio("/nonexistent/file.mp3")
     
     @pytest.mark.asyncio
@@ -111,8 +111,8 @@ class TestWhisperService:
             temp_path = f.name
         
         try:
-            with patch('app.whisper_service.validate_audio_file', return_value={"duration": 1.0}):
-                with patch('app.whisper_service.preprocess_audio', return_value=temp_path):
+            with patch('app.whisper.transcription_pipeline.validate_audio_file', return_value={"duration": 1.0}):
+                with patch('app.whisper.transcription_pipeline.preprocess_audio', return_value=temp_path):
                     with pytest.raises(TranscriptionFailed):
                         await service.transcribe_audio(temp_path)
         finally:
@@ -137,8 +137,8 @@ class TestWhisperService:
             temp_path = f.name
         
         try:
-            with patch('app.whisper_service.validate_audio_file', return_value={"duration": 1.0}):
-                with patch('app.whisper_service.preprocess_audio', return_value=temp_path):
+            with patch('app.whisper.transcription_pipeline.validate_audio_file', return_value={"duration": 1.0}):
+                with patch('app.whisper.transcription_pipeline.preprocess_audio', return_value=temp_path):
                     with pytest.raises(TranscriptionFailed):
                         await service._transcribe_sync(temp_path, None, 0.0, "transcribe", None)
         finally:
@@ -155,10 +155,10 @@ class TestWhisperService:
             temp_path = f.name
         
         try:
-            with patch('app.whisper_service.validate_audio_file', return_value={"duration": 1.0}):
-                with patch('app.whisper_service.preprocess_audio', 
+            with patch('app.whisper.transcription_pipeline.validate_audio_file', return_value={"duration": 1.0}):
+                with patch('app.whisper.transcription_pipeline.preprocess_audio',
                           side_effect=AudioProcessingError("Preprocessing failed")):
-                    with pytest.raises(TranscriptionFailed):
+                    with pytest.raises(AudioProcessingError):
                         await service.transcribe_audio(temp_path)
         finally:
             if os.path.exists(temp_path):
@@ -174,7 +174,7 @@ class TestWhisperService:
             temp_path = f.name
         
         try:
-            with patch('app.whisper_service.validate_audio_file', 
+            with patch('app.whisper.transcription_pipeline.validate_audio_file',
                       side_effect=Exception("Invalid file")):
                 with pytest.raises(TranscriptionFailed):
                     await service.transcribe_audio(temp_path)

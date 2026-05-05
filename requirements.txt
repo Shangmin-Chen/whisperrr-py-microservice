@@ -1,4 +1,4 @@
 # Dependency source of truth is pyproject.toml.
-# Runtime (e.g. Docker): pip install .
+# Runtime: pip install .
 # With dev tools: pip install '.[dev]'
 .

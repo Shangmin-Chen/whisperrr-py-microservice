@@ -26,10 +26,12 @@ def api_client():
         return None
 
     with patch(
-        "app.main.whisper_service.load_model",
+        "app.whisper_service.whisper_service.load_model",
         AsyncMock(return_value={"success": True}),
     ):
-        with patch("app.main.whisper_service.cleanup", new_callable=AsyncMock):
+        with patch(
+            "app.whisper_service.whisper_service.cleanup", new_callable=AsyncMock
+        ):
             from app.main import app as fastapi_application
 
             fastapi_application.dependency_overrides[
@@ -54,7 +56,7 @@ def mock_transcription_success():
         processing_time=0.01,
     )
     mock = AsyncMock(return_value=resp)
-    with patch("app.main.whisper_service.transcribe_audio", mock):
+    with patch("app.whisper_service.whisper_service.transcribe_audio", mock):
         yield mock
 
 
@@ -66,7 +68,8 @@ class TestTranscribeHTTP:
             validate_audio_file(file_path)
 
         with patch(
-            "app.main.whisper_service.transcribe_audio", side_effect=validating_only
+            "app.whisper_service.whisper_service.transcribe_audio",
+            side_effect=validating_only,
         ):
             files = {"file": ("readme.txt", b"hello", "text/plain")}
             r = api_client.post("/transcribe", files=files)
@@ -86,7 +89,7 @@ class TestTranscribeHTTP:
 
 class TestJobLifecycleHTTP:
     def test_submit_then_progress_stays_pending_when_worker_mocked(self, api_client):
-        with patch("app.main.process_transcription_job", new=AsyncMock()):
+        with patch("app.routers.jobs.process_transcription_job", new=AsyncMock()):
             files = {"file": ("tiny.mp3", b"ID3x", "audio/mpeg")}
             r = api_client.post("/jobs/submit", files=files)
             assert r.status_code == 200
